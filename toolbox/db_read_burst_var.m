@@ -3,7 +3,7 @@ function burst_data_var = db_read_burst_var(ncfile, nburst, var)
 
 arguments
     ncfile (1,1) string
-    nburst (1,1) double {mustBeInteger, mustBePositive}
+    nburst
     var {mustBeTextScalar}
 end
 
@@ -11,18 +11,19 @@ var = string(var);
 
 % Alias opcionales
 switch lower(char(var))
-    case 'ast'
-        var = "ast_distance_m";
-    case 'pressure'
-        var = "pressure_dbar";
-    case {'velocity','vel'}
-        var = "velocity_ms";
+    case {'ast', 's'}
+        var = "ast_distance";
+    case {'pressure', 'presión', 'presion', 'press', 'p'}
+        var = "pressure";
+    case {'velocity','vel', 'velocidad', 'v'}
+        var = "velocity";
 end
 
 if ~isfile(ncfile)
     error('El archivo no existe: %s', ncfile);
 end
 
+% Verificar que la variable exista y obtener info
 info_var = ncinfo(ncfile, char(var));
 
 dim_names = string({info_var.Dimensions.Name});
@@ -33,24 +34,41 @@ if isempty(burst_dim_idx)
     error('La variable "%s" no depende de la dimensión "burst".', var);
 end
 
-if nburst > dim_lens(burst_dim_idx)
-    error('nburst=%d excede el número de bursts (%d).', ...
-        nburst, dim_lens(burst_dim_idx));
+nBurstsTotal = dim_lens(burst_dim_idx);
+
+% Detectar modo ALL
+leer_todos = isempty(nburst) || ...
+             (ischar(nburst)   && strcmpi(nburst,'all')) || ...
+             (isstring(nburst) && isscalar(nburst) && lower(nburst) == "all");
+
+if leer_todos
+    % Leer toda la variable
+    data = ncread(ncfile, char(var));
+else
+    % Validar nburst numérico
+    if ~(isnumeric(nburst) && isscalar(nburst) && ...
+         isfinite(nburst) && nburst == floor(nburst) && nburst > 0)
+        error('nburst debe ser un entero positivo o ''all''.');
+    end
+
+    if nburst > nBurstsTotal
+        error('nburst=%d excede el número de bursts (%d).', ...
+            nburst, nBurstsTotal);
+    end
+
+    start = ones(1, numel(dim_lens));
+    count = dim_lens;
+
+    start(burst_dim_idx) = nburst;
+    count(burst_dim_idx) = 1;
+
+    data = ncread(ncfile, char(var), start, count);
 end
-
-start = ones(1, numel(dim_lens));
-count = dim_lens;
-
-start(burst_dim_idx) = nburst;
-count(burst_dim_idx) = 1;
-
-data = ncread(ncfile, char(var), start, count);
 
 if var == "time"
     data = db_posix2datetime(data);
 end
 
 burst_data_var = squeeze(data);
-
 
 end
