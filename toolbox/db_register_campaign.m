@@ -17,8 +17,12 @@ function db_register_campaign(db_dir, Sitio, Camp, start_date, end_date, mountin
     else
         end_date = string(end_date);
     end
-
-    mounting_height = string(mounting_height);
+    
+    if isempty(mounting_height)
+        mounting_height = "";
+    else
+        mounting_height = string(mounting_height);
+    end
 
     instrument_serial = string(instrument_serial);
     status = string(status);
