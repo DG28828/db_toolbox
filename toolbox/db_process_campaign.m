@@ -93,20 +93,20 @@ end
 
 files_dir = fullfile(db_dir, ...                                            %Directorio de archivos crudos: raw/Sitio/Camp/Raw_Data
                     'raw', Sitio, Camp, 'Raw_Data');                
-save_plot_dir = fullfile(db_dir, ...                                        %Directorio para guardado de figuras: figures/Sitio/Camp/Quality_check
-                    'figures', Sitio, Camp, 'Quality_check');
+save_plot_dir = fullfile(db_dir, ...                                        %Directorio para guardado de figuras: figures/Sitio/Camp/Quality
+                    'figures', Sitio, Camp, 'Quality');
 
 %Leer datos crudos
 data = wsa_awac_read(files_dir, ...                                         %Struct con datos leidos y quality check
                     'do_plot', true, ...
                     'save_plot_dir', save_plot_dir);
 
-%Exportar a netCDF en carpeta intermediate
-intermediate_dir = fullfile(db_dir, 'intermediate', Sitio);                 %Directorio para datos crudos: intermediate/Sitio
-if ~exist(fullfile(intermediate_dir, Camp), 'dir')                          %Crea directorio para la campaña, en caso de no existir
-    mkdir(fullfile(intermediate_dir, Camp));
+%Exportar a netCDF en carpeta raw_nc
+raw_nc_dir = fullfile(db_dir, 'raw_nc', Sitio);                 %Directorio para datos crudos: raw_nc/Sitio
+if ~exist(fullfile(raw_nc_dir, Camp), 'dir')                          %Crea directorio para la campaña, en caso de no existir
+    mkdir(fullfile(raw_nc_dir, Camp));
 end
-raw_ncfile = fullfile(intermediate_dir, ...                                 %Nombre del archivo netCDF: Sitio_Camp_raw.nc
+raw_ncfile = fullfile(raw_nc_dir, ...                                 %Nombre del archivo netCDF: Sitio_Camp_raw.nc
                       Camp , [Sitio, '_', Camp, '_', 'raw.nc']);
 wsa_awac_nc_write(data, ...                                                 %Escribe el struct data en formato netCDF
                   raw_ncfile, ...
