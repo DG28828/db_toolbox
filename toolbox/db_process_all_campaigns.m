@@ -136,6 +136,7 @@ for i = 1:height(raw_campaigns_table)
                     'wsa_toolbox_dir', opts.wsa_toolbox_dir);
 
         results = [results; {string(Site), string(Camp), action, "success", ""}]; %#ok<AGROW>
+        close all;
 
     catch ME
 
