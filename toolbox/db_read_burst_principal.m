@@ -31,16 +31,16 @@ if leer_todos
     burst_data_principal.t              = db_posix2datetime(ncread(ncfile, 'time'));
     burst_data_principal.burst_counter  = ncread(ncfile, 'burst_counter');
     burst_data_principal.P              = ncread(ncfile, 'pressure');
-    burst_data_principal.AST            = ncread(ncfile, 'ast_distance');
-    burst_data_principal.V              = ncread(ncfile, 'velocity');
+    burst_data_principal.AST            = ncread(ncfile, 'ast');
+    burst_data_principal.V              = ncread(ncfile, 'velocity_beams');
 
 else
     % ===== UN SOLO BURST =====
     burst_data_principal.t              = db_posix2datetime(ncread(ncfile, 'time', nburst, 1));
     burst_data_principal.burst_counter  = ncread(ncfile, 'burst_counter', nburst, 1);
     burst_data_principal.P              = ncread(ncfile, 'pressure', [1, nburst], [Inf, 1]);
-    burst_data_principal.AST            = ncread(ncfile, 'ast_distance', [1, 1, nburst], [Inf, Inf, 1]);
-    burst_data_principal.V              = ncread(ncfile, 'velocity', [1, 1, nburst], [Inf, Inf, 1]);
+    burst_data_principal.AST            = ncread(ncfile, 'ast', [1, 1, nburst], [Inf, Inf, 1]);
+    burst_data_principal.V              = ncread(ncfile, 'velocity_beams', [1, 1, nburst], [Inf, Inf, 1]);
 end
 
 end

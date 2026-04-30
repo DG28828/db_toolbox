@@ -12,11 +12,11 @@ var = string(var);
 % Alias opcionales
 switch lower(char(var))
     case {'ast', 's'}
-        var = "ast_distance";
+        var = "ast";
     case {'pressure', 'presión', 'presion', 'press', 'p'}
         var = "pressure";
     case {'velocity','vel', 'velocidad', 'v'}
-        var = "velocity";
+        var = "velocity_beams";
 end
 
 if ~isfile(ncfile)
