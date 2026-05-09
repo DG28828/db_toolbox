@@ -10,14 +10,14 @@ end
 var = string(var);
 
 % Alias opcionales
-switch lower(char(var))
-    case {'ast', 's'}
-        var = "ast";
-    case {'pressure', 'presión', 'presion', 'press', 'p'}
-        var = "pressure";
-    case {'velocity','vel', 'velocidad', 'v'}
-        var = "velocity_beams";
-end
+% switch lower(char(var))
+%     case {'ast', 's'}
+%         var = "ast";
+%     case {'pressure', 'presión', 'presion', 'press', 'p'}
+%         var = "pressure";
+%     case {'velocity','vel', 'velocidad', 'v'}
+%         var = "velocity_beams";
+% end
 
 if ~isfile(ncfile)
     error('El archivo no existe: %s', ncfile);

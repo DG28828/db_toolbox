@@ -1,4 +1,14 @@
-function db_process_campaign(db_dir, Sitio, Camp, opts)
+function info = db_process_campaign(db_dir, Sitio, Camp, opts)
+%
+% Acciones:
+% "procesamiento_completo"                  Lee raw, crea raw.nc, limpia, crea clean.nc y preprocesa
+% "limpiar_raw_nc"                          Usa raw.nc existente, crea .nc limpio y preprocesa
+% "preprocesar_datos_limpios_existentes"    Usa .nc limpio existente y ejecuta preprocesamiento
+% "sobreescribir_datos_crudos_y_limpiar"    Fuerza raw.nc y .nc limpio por overwrite
+% "sobreescribir_datos_limpios"             Fuerza .nc limpio usando raw.nc existente
+% "limpio_y_preprocesado"                   Ya existe .nc limpio y ya está preprocesado
+% "sobreescribir_datos_limpios"             Genera o conserva .nc limpio, pero no preprocesa
+% "omitir"                                  Se omite por only_new=true
 
 
 %% Manejo de entradas
@@ -8,9 +18,24 @@ arguments
     Camp char;
     opts.mounting_height {mustBeNumeric} = []
     opts.wsa_toolbox_dir char = ''
+    opts.raw_overwrite logical = false
+    opts.clean_overwrite logical = false
+    opts.preproc_overwrite logical = false
+    opts.preproc_flag logical = true
 end
 
 mounting_height = opts.mounting_height;  %m
+
+%% Inicializar struct info de salida
+info = struct();
+info.site = string(Sitio);
+info.campaign = string(Camp);
+info.raw_action = "not_evaluated";
+info.clean_action = "not_evaluated";
+info.preproc_action = "not_evaluated";
+info.message = "";
+info.log_file = "";
+info.ncdisp_file = "";
 
 %% Verificaciones iniciales
 
@@ -38,6 +63,7 @@ req_wsa = {
     'wsa_awac_read'
     'wsa_awac_clean'
     'wsa_awac_nc_write'
+    'wsa_awac_preprocess'
     };
 
 % Verificar existencia de funciones
@@ -52,6 +78,7 @@ if ~exist(log_dir, 'dir')                                                   %Cre
 end
 log_file = fullfile(log_dir, ['log_', Sitio, '_', Camp, '_proc_at_', ...    %Nombre del archivo log a guardar log_Sitio_Camp_proc_at_fecha.txt
             char(string(datetime('now'), 'yyyy-MM-dd_HHmmss')), '.txt']);
+info.log_file = string(log_file);
 diary(log_file);                                                            %Comenzar a registrar archivo log.
 
 %Encabezado del archivo log
@@ -88,95 +115,232 @@ if isempty(mounting_height)                                                 % Se
     fprintf('Utilizando la altura del equipo indicada en el archivo de metadatos: mounting_height = %.2f m.\n', mounting_height)
 end
 
+%% Rutas de archivos NetCDF
 
-%% Leer Raw Data
+raw_nc_dir = fullfile(db_dir, 'raw_nc', Sitio, Camp);
+raw_ncfile = fullfile(raw_nc_dir, [Sitio, '_', Camp, '_raw.nc']);
 
-files_dir = fullfile(db_dir, ...                                            %Directorio de archivos crudos: raw/Sitio/Camp/Raw_Data
-                    'raw', Sitio, Camp, 'Raw_Data');                
-save_plot_dir = fullfile(db_dir, ...                                        %Directorio para guardado de figuras: figures/Sitio/Camp/Quality
-                    'figures', Sitio, Camp, 'Quality');
+processed_dir = fullfile(db_dir, 'processed', Sitio, Camp);
+proc_ncfile = fullfile(processed_dir, [Sitio, '_', Camp, '.nc']);
 
-%Leer datos crudos
-data = wsa_awac_read(files_dir, ...                                         %Struct con datos leidos y quality check
-                    'do_plot', true, ...
-                    'save_plot_dir', save_plot_dir);
 
-%Exportar a netCDF en carpeta raw_nc
-raw_nc_dir = fullfile(db_dir, 'raw_nc', Sitio);                 %Directorio para datos crudos: raw_nc/Sitio
-if ~exist(fullfile(raw_nc_dir, Camp), 'dir')                          %Crea directorio para la campaña, en caso de no existir
-    mkdir(fullfile(raw_nc_dir, Camp));
+%% Leer Raw Data y crear raw.nc
+
+%Verificar existencia de archivo raw.nc
+raw_exists = isfile(raw_ncfile);
+
+if raw_exists && ~opts.raw_overwrite
+
+    fprintf('\nYa existe raw.nc y raw_overwrite=false. Se omite lectura de Raw_Data.\n');
+    fprintf('Archivo existente: %s\n', raw_ncfile);
+    data = [];
+
+    info.raw_action = "skipped_existing_raw_nc";
+
+else
+    files_dir = fullfile(db_dir, 'raw', Sitio, Camp, 'Raw_Data');               %Directorio de archivos crudos: raw/Sitio/Camp/Raw_Data
+                                        
+    save_plot_dir = fullfile(db_dir, 'figures', Sitio, Camp, 'Quality');        %Directorio para guardado de figuras: figures/Sitio/Camp/Quality
+                        
+    
+    %Leer datos crudos
+    data = wsa_awac_read(files_dir, ...                                         %Struct con datos leidos y quality check
+                        'do_plot', true, ...
+                        'save_plot_dir', save_plot_dir);
+    
+    %Exportar a netCDF en carpeta raw_nc
+    if ~exist(raw_nc_dir, 'dir')
+        mkdir(raw_nc_dir);                                                      %Crea directorio para la campaña, en caso de no existir
+    end
+    wsa_awac_nc_write(data, ...                                                 %Escribe el struct data en formato netCDF
+                      raw_ncfile, ...
+                      'site_name', Sitio, ...
+                      'campaign_name', Camp, ...
+                      'mounting_height', mounting_height);
+
+    info.raw_action = "created_raw_nc";
+    
+    %Imprimir el formato del archivo netCDF resultante
+    fprintf('\n\nFormato de archivo netCDF resultante:\n')                      
+    ncdisp(raw_ncfile);
+    
+    %Registrar campaña en archivo de metadatos
+    fprintf('\nRegistrando campaña en archivo de metadatos de campaña: metadata\\campaign.csv\n')
+    start_date = data.quality.summary.time_start;
+    end_date = data.quality.summary.time_end;
+    raw_bursts = data.quality.summary.total_bursts;
+    clean_bursts = [];
+    instrument_serial = data.hdr.hardware_configuration.Serial_number;
+    head_serial = data.hdr.head_configuration.Serial_number;
+    clean_status = 'raw';
+    proc_status = 'not_processed';
+    raw_nc = raw_ncfile;
+    proc_nc = '';
+    db_register_campaign(db_dir, ...                                            %Función que registra los metadatos relevantes de la campaña
+                         Sitio, ...
+                         Camp, ...
+                         start_date, ...
+                         end_date, ...
+                         raw_bursts, ...
+                         clean_bursts, ...
+                         mounting_height, ...
+                         instrument_serial, ...
+                         head_serial, ...
+                         clean_status, ...
+                         proc_status, ...
+                         raw_nc, ...
+                         proc_nc)
 end
-raw_ncfile = fullfile(raw_nc_dir, ...                                 %Nombre del archivo netCDF: Sitio_Camp_raw.nc
-                      Camp , [Sitio, '_', Camp, '_', 'raw.nc']);
-wsa_awac_nc_write(data, ...                                                 %Escribe el struct data en formato netCDF
-                  raw_ncfile, ...
-                  'site_name', Sitio, ...
-                  'campaign_name', Camp, ...
-                  'mounting_height', mounting_height);
 
-%Imprimir el formato del archivo netCDF resultante
-fprintf('\n\nFormato de archivo netCDF resultante:\n')                      
-ncdisp(raw_ncfile);
+%% Limpiar datos y crear .nc en \processed
 
-%Registrar campaña en archivo de metadatos
-fprintf('\nRegistrando campaña en archivo de metadatos de campaña: metadata\\campaign.csv\n')
-start_date = data.quality.summary.time_start;
-end_date = data.quality.summary.time_end;
-instrument_serial = data.hdr.hardware_configuration.Serial_number;
-status = 'raw';
-raw_nc = raw_ncfile;
-clean_nc = '';
-db_register_campaign(db_dir, ...                                            %Función que registra los metadatos relevantes de la campaña
-                     Sitio, ...
-                     Camp, ...
-                     start_date, ...
-                     end_date, ...
-                     mounting_height, ...
-                     instrument_serial, ...
-                     status, ...
-                     raw_nc, ...
-                     clean_nc)
+%Verificar existencia de archivo .nc en \processed 
+proc_exists = isfile(proc_ncfile);
 
-%% Limpiar datos
+%Verifica estado de limpieza de archivo .nc
+try
+    cleaning_status = logical(ncreadatt(proc_ncfile, '/', 'cleaning_status'));
+catch
+    warning('No se pudo leer el atributo cleaning_status. Estableciendo cleaning_status = false')
+    cleaning_status = false;
+end 
 
-%Limpieza de datos
-data_clean = wsa_awac_clean(data);                                          %Función que limpia los datos extraidos con wsa_awac_read()
+if proc_exists && cleaning_status && ~opts.clean_overwrite
 
-%Exportar a netCDF en carpeta processed
-processed_dir = fullfile(db_dir, 'processed', Sitio);                       %Directorio para datos limpios: processed/Sitio
-if ~exist(fullfile(processed_dir, Camp), 'dir')                             %Crea directorio para la campaña, en caso de no existir
-    mkdir(fullfile(processed_dir, Camp));
+    fprintf('\nEl archivo .nc se encuentra limpio y clean_overwrite = false. Se omite limpieza.\n');
+    fprintf('Archivo existente: %s\n', proc_ncfile);
+
+    data_clean = [];
+
+    info.clean_action = "skipped_existing_clean_nc";
+
+else
+    if isempty(data)
+        fprintf('\nEl archivo raw.nc existe, pero se requiere limpiar nuevamente.\n');
+        fprintf('Recuperando datos crudos desde raw.nc:\n%s\n', raw_ncfile);
+    
+        data_clean = wsa_awac_clean(raw_ncfile);
+
+        info.clean_action = "created_clean_nc_from_existing_raw_nc";
+    else
+        data_clean = wsa_awac_clean(data);
+
+        info.clean_action = "created_clean_nc_from_raw_data";
+    end
+    
+    %Exportar a netCDF en carpeta processed
+    processed_dir = fullfile(db_dir, 'processed', Sitio);                       %Directorio para datos limpios: processed/Sitio
+    if ~exist(fullfile(processed_dir, Camp), 'dir')                             %Crea directorio para la campaña, en caso de no existir
+        mkdir(fullfile(processed_dir, Camp));
+    end
+    proc_ncfile = fullfile(processed_dir, ...                                  %Nombre del archivo netCDF: Sitio_Camp.nc
+                            Camp , [Sitio, '_', Camp, '.nc']);
+    wsa_awac_nc_write(data_clean, ...                                           %Escribe el struct data en formato netCDF
+                      proc_ncfile, ...
+                      'site_name', Sitio, ...
+                      'campaign_name', Camp, ...
+                      'mounting_height', mounting_height);
+    
+    fprintf('\n\nFormato de archivo netCDF resultante:\n')
+    ncdisp(proc_ncfile);
+    
+    fprintf('\nRegistrando campaña en archivo de metadatos de campaña: metadata\\campaign.csv\n')
+    start_date = data_clean.cleaning.time_start;
+    end_date = data_clean.cleaning.time_end;
+    raw_bursts = data_clean.quality.summary.total_bursts;
+    clean_bursts = data_clean.cleaning.Number_of_wave_measurements;
+    instrument_serial = data_clean.hdr.hardware_configuration.Serial_number;
+    head_serial = data_clean.hdr.head_configuration.Serial_number;
+    clean_status = 'clean';
+    proc_status = 'not_processed';
+    raw_nc = raw_ncfile;
+    proc_nc = proc_ncfile;
+    db_register_campaign(db_dir, ...                                            %Función que registra los metadatos relevantes de la campaña
+                         Sitio, ...
+                         Camp, ...
+                         start_date, ...
+                         end_date, ...
+                         raw_bursts, ...
+                         clean_bursts, ...
+                         mounting_height, ...
+                         instrument_serial, ...
+                         head_serial, ...
+                         clean_status, ...
+                         proc_status, ...
+                         raw_nc, ...
+                         proc_nc)
 end
-clean_ncfile = fullfile(processed_dir, ...                                  %Nombre del archivo netCDF: Sitio_Camp_clean.nc
-                        Camp , [Sitio, '_', Camp, '_', 'clean.nc']);
-wsa_awac_nc_write(data_clean, ...                                           %Escribe el struct data en formato netCDF
-                  clean_ncfile, ...
-                  'site_name', Sitio, ...
-                  'campaign_name', Camp, ...
-                  'mounting_height', mounting_height);
 
-fprintf('\n\nFormato de archivo netCDF resultante:\n')
-ncdisp(clean_ncfile);
+%% Preprocesamiento de los datos en el archivo netCDF
 
-fprintf('\nRegistrando campaña en archivo de metadatos de campaña: metadata\\campaign.csv\n')
-start_date = data_clean.cleaning.time_start;
-end_date = data_clean.cleaning.time_end;
-instrument_serial = data.hdr.hardware_configuration.Serial_number;
-status = 'clean';
-raw_nc = raw_ncfile;
-clean_nc = clean_ncfile;
-db_register_campaign(db_dir, ...                                            %Función que registra los metadatos relevantes de la campaña
-                     Sitio, ...
-                     Camp, ...
-                     start_date, ...
-                     end_date, ...
-                     mounting_height, ...
-                     instrument_serial, ...
-                     status, ...
-                     raw_nc, ...
-                     clean_nc)
+%Se ejecuta solo si preproc_flag = true (por defecto)
+if opts.preproc_flag
 
-% Mensaje final si todo se realizó correctamente
+    if isfile(proc_ncfile)
+        ncfile_to_process = proc_ncfile;
+        fprintf('\nPreprocesando archivo .nc con wsa_awac_preprocess:\n%s\n', ncfile_to_process);
+
+    else
+        error('db_proc_camp:MissingNetCDF', ...
+            ['No existe .nc para ejecutar wsa_awac_preprocess.\n'
+             'ncfile : %s'], ...
+             proc_ncfile);
+    end
+    
+    %Solo se preprocesa si no ha sido preprocesado o si se indica preproc_overwrite = true
+    try
+        preproc_status = logical(ncreadatt(ncfile_to_process, '/', 'preprocessing_status'));
+    catch
+        preproc_status = false;
+    end
+
+    if ~preproc_status || opts.preproc_overwrite
+        proc_info = wsa_awac_preprocess(ncfile_to_process);
+
+        %Indicar en el archivo .nc que se preprocesó la campaña
+        ncwriteatt(ncfile_to_process, '/', 'preprocessing_status', double(true));
+
+        %Indicar en el archivo de metadatos que se procesó la camapaña
+        db_update_campaign_field(db_dir, Sitio, Camp, ...
+                                'processing_status', 'processed');
+
+        info.preproc_action = "preprocessed_clean_nc";
+        fprintf('\n\nFormato de archivo netCDF resultante:\n')
+        ncdisp(ncfile_to_process);
+    else
+        proc_info = [];
+        info.preproc_action = "skipped_existing_preprocessing";
+        fprintf('\nEl archivo ya estaba preprocesado y preproc_overwrite=false. Se omite wsa_awac_preprocess.\n');
+    end
+
+else
+
+    proc_info = [];
+    info.preproc_action = "disabled_by_preproc_flag";
+    fprintf('\npreproc_flag=false. Se omite wsa_awac_preprocess.\n');
+
+end
+
+%% Generar archivo de texto con contenido del NetCDF en la carpeta
+
+if isfile(proc_ncfile)
+    info.ncdisp_file = db_write_ncdisp_txt(proc_ncfile);
+else
+    info.ncdisp_file = "";
+    fprintf('\nNo se generó archivo ncdisp porque no existe el archivo .nc:\n%s\n', proc_ncfile);
+end
+
+
+%% Mensaje final si todo se realizó correctamente
+info.message = sprintf( ...
+    'raw: %s | clean: %s | preproc: %s', ...
+    info.raw_action, ...
+    info.clean_action, ...
+    info.preproc_action);
+
+fprintf('\nResumen de acciones realizadas:\n');
+fprintf('%s\n', info.message);
+
 fprintf('\n\n========================================================================================================================\n');
 fprintf('Procesamiento finalizado correctamente: %s\n', char(string(datetime('now'), 'yyyy-MM-dd_HHmmss')));
 fprintf('========================================================================================================================\n');
@@ -236,4 +400,38 @@ function check_required_functions(func_list, toolbox_name, opt_name)
                        toolbox_name, strjoin(missing, ', '), opt_name);
         error('db_proc_camp:MissingDependencies', '%s', msg);
     end
+end
+
+function txt_file = db_write_ncdisp_txt(ncfile)
+%db_write_ncdisp_txt - Guarda la salida de ncdisp en un archivo .txt.
+%
+%   txt_file = db_write_ncdisp_txt(ncfile)
+%
+%   Genera un archivo de texto en el mismo directorio del NetCDF con el
+%   contenido mostrado por ncdisp.
+
+    if ~isfile(ncfile)
+        txt_file = "";
+        return
+    end
+
+    [nc_dir, nc_name, ~] = fileparts(ncfile);
+    txt_file = fullfile(nc_dir, [nc_name, '_ncdisp.txt']);
+
+    nc_text = evalc('ncdisp(ncfile)');
+
+    fid = fopen(txt_file, 'w');
+
+    if fid == -1
+        warning('db_write_ncdisp_txt:FileOpenError', ...
+            'No se pudo crear el archivo ncdisp: %s', txt_file);
+        txt_file = "";
+        return
+    end
+
+    fprintf(fid, '%s', nc_text);
+    fclose(fid);
+
+    fprintf('\nArchivo ncdisp generado:\n%s\n', txt_file);
+
 end

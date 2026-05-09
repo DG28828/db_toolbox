@@ -28,19 +28,49 @@ burst_data_principal = struct;
 
 if leer_todos
     % ===== LEER TODO =====
-    burst_data_principal.t              = db_posix2datetime(ncread(ncfile, 'time'));
-    burst_data_principal.burst_counter  = ncread(ncfile, 'burst_counter');
-    burst_data_principal.P              = ncread(ncfile, 'pressure');
-    burst_data_principal.AST            = ncread(ncfile, 'ast');
-    burst_data_principal.V              = ncread(ncfile, 'velocity_beams');
+
+    %Generales del burst
+    burst_data_principal.general.time             = db_posix2datetime(ncread(ncfile, 'time'));
+    burst_data_principal.general.burst_counter    = ncread(ncfile, 'burst_counter');
+    burst_data_principal.general.ast_mean         = ncread(ncfile, 'ast_mean');
+    burst_data_principal.general.cell_position    = ncread(ncfile, 'cell_position');
+    burst_data_principal.general.mounting_height  = ncreadatt(ncfile, '/', 'mounting_height_m');
+    burst_data.general.fs               = ncreadatt(ncfile, '/', 'wave_sampling_rate_Hz');
+    
+    %Tiempo
+    burst_data_principal.time.burst_time          = db_posix2datetime(ncread(ncfile, 'burst_time'));
+
+    %Datos procesados (despiking en AST y filtrado)
+    burst_data_principal.processed.pressure       = ncread(ncfile, 'pressure_proc');
+    burst_data_principal.processed.ast            = ncread(ncfile, 'ast_proc');
+    burst_data_principal.processed.ast_comb       = ncread(ncfile, 'ast_proc_comb');
+    burst_data_principal.processed.velocity_enu   = ncread(ncfile, 'velocity_proc');
+    burst_data_principal.processed.ast_quality    = ncread(ncfile, 'ast_quality');
+    burst_data_principal.processed.ast_bad_detects = ncread(ncfile, 'ast_bad_detects');
+    burst_data_principal.processed.ast_bad_detects_percentage = ncread(ncfile, 'ast_bad_detects_percentage');
 
 else
     % ===== UN SOLO BURST =====
-    burst_data_principal.t              = db_posix2datetime(ncread(ncfile, 'time', nburst, 1));
-    burst_data_principal.burst_counter  = ncread(ncfile, 'burst_counter', nburst, 1);
-    burst_data_principal.P              = ncread(ncfile, 'pressure', [1, nburst], [Inf, 1]);
-    burst_data_principal.AST            = ncread(ncfile, 'ast', [1, 1, nburst], [Inf, Inf, 1]);
-    burst_data_principal.V              = ncread(ncfile, 'velocity_beams', [1, 1, nburst], [Inf, Inf, 1]);
+
+    %Generales del burst
+    burst_data_principal.general.time             = db_posix2datetime(ncread(ncfile, 'time', nburst, 1));
+    burst_data_principal.general.burst_counter    = ncread(ncfile, 'burst_counter', nburst, 1);
+    burst_data_principal.general.ast_mean         = ncread(ncfile, 'ast_mean', nburst, 1);
+    burst_data_principal.general.cell_position    = ncread(ncfile, 'cell_position', nburst, 1);
+    burst_data_principal.general.mounting_height  = ncread(ncfile, 'mounting_height_m');
+    burst_data.general.fs               = ncreadatt(ncfile, '/', 'wave_sampling_rate_Hz');
+    
+    %Tiempo
+    burst_data_principal.time.burst_time          = db_posix2datetime(ncread(ncfile, 'burst_time', [1, nburst], [Inf, 1]));
+
+    %Datos procesados (despiking en AST y filtrado)
+    burst_data_principal.processed.pressure       = ncread(ncfile, 'pressure_proc', [1, nburst], [Inf, 1]);
+    burst_data_principal.processed.ast            = ncread(ncfile, 'ast_proc', [1, 1, nburst], [Inf, Inf, 1]);
+    burst_data_principal.processed.ast_comb       = ncread(ncfile, 'ast_proc_comb', [1, 1, nburst], [Inf, Inf, 1]);
+    burst_data_principal.processed.velocity_enu   = ncread(ncfile, 'velocity_proc', [1, 1, nburst], [Inf, Inf, 1]);
+    burst_data_principal.processed.ast_quality    = ncread(ncfile, 'ast_quality', [1, nburst], [Inf, 1]);
+    burst_data_principal.processed.ast_bad_detects = ncread(ncfile, 'ast_bad_detects', [1, nburst], [Inf, 1]);
+    burst_data_principal.processed.ast_bad_detects_percentage = ncread(ncfile, 'ast_bad_detects_percentage', [1, nburst], [Inf, 1]);
 end
 
 end
