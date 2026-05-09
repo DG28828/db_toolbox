@@ -212,7 +212,7 @@ if proc_exists && cleaning_status && ~opts.clean_overwrite
 
     data_clean = [];
 
-    info.clean_action = "skipped_existing_clean_nc";
+    info.clean_action = "skipped_existing_nc";
 
 else
     if isempty(data)
@@ -221,11 +221,11 @@ else
     
         data_clean = wsa_awac_clean(raw_ncfile);
 
-        info.clean_action = "created_clean_nc_from_existing_raw_nc";
+        info.clean_action = "created_nc_from_existing_raw_nc";
     else
         data_clean = wsa_awac_clean(data);
 
-        info.clean_action = "created_clean_nc_from_raw_data";
+        info.clean_action = "created_nc_from_raw_data";
     end
     
     %Exportar a netCDF en carpeta processed
@@ -304,7 +304,7 @@ if opts.preproc_flag
         db_update_campaign_field(db_dir, Sitio, Camp, ...
                                 'processing_status', 'processed');
 
-        info.preproc_action = "preprocessed_clean_nc";
+        info.preproc_action = "preprocessed_nc";
         fprintf('\n\nFormato de archivo netCDF resultante:\n')
         ncdisp(ncfile_to_process);
     else
