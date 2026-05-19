@@ -35,7 +35,7 @@ if leer_todos
     burst_data_principal.general.ast_mean         = ncread(ncfile, 'ast_mean');
     burst_data_principal.general.cell_position    = ncread(ncfile, 'cell_position');
     burst_data_principal.general.mounting_height  = ncreadatt(ncfile, '/', 'mounting_height_m');
-    burst_data.general.fs               = ncreadatt(ncfile, '/', 'wave_sampling_rate_Hz');
+    burst_data_principal.general.fs                         = ncreadatt(ncfile, '/', 'wave_sampling_rate_Hz');
     
     %Tiempo
     burst_data_principal.time.burst_time          = db_posix2datetime(ncread(ncfile, 'burst_time'));
@@ -58,7 +58,7 @@ else
     burst_data_principal.general.ast_mean         = ncread(ncfile, 'ast_mean', nburst, 1);
     burst_data_principal.general.cell_position    = ncread(ncfile, 'cell_position', nburst, 1);
     burst_data_principal.general.mounting_height  = ncread(ncfile, 'mounting_height_m');
-    burst_data.general.fs               = ncreadatt(ncfile, '/', 'wave_sampling_rate_Hz');
+    burst_data_principal.general.fs                         = ncreadatt(ncfile, '/', 'wave_sampling_rate_Hz');
     
     %Tiempo
     burst_data_principal.time.burst_time          = db_posix2datetime(ncread(ncfile, 'burst_time', [1, nburst], [Inf, 1]));

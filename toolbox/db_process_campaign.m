@@ -67,7 +67,7 @@ req_wsa = {
     };
 
 % Verificar existencia de funciones
-check_required_functions(req_wsa, 'WSA', 'opts.wsa_toolbox_dir');
+db_check_required_functions(req_wsa, 'WSA', 'opts.wsa_toolbox_dir');
 
 
 %% Crear log file
@@ -170,6 +170,9 @@ else
     end_date = data.quality.summary.time_end;
     raw_bursts = data.quality.summary.total_bursts;
     clean_bursts = [];
+    fs_Hz = data.hdr.setup.Wave_Sampling_rate_Hz;
+    wave_burst_duration_s = data.hdr.setup.Wave_burst_duration_s;
+    blanking_distance_m = data.hdr.setup.Blanking_distance_m;
     instrument_serial = data.hdr.hardware_configuration.Serial_number;
     head_serial = data.hdr.head_configuration.Serial_number;
     clean_status = 'raw';
@@ -183,6 +186,9 @@ else
                          end_date, ...
                          raw_bursts, ...
                          clean_bursts, ...
+                         fs_Hz, ...
+                         wave_burst_duration_s, ...
+                         blanking_distance_m, ...
                          mounting_height, ...
                          instrument_serial, ...
                          head_serial, ...
@@ -249,6 +255,9 @@ else
     end_date = data_clean.cleaning.time_end;
     raw_bursts = data_clean.quality.summary.total_bursts;
     clean_bursts = data_clean.cleaning.Number_of_wave_measurements;
+    fs_Hz = data_clean.hdr.setup.Wave_Sampling_rate_Hz;
+    wave_burst_duration_s = data_clean.hdr.setup.Wave_burst_duration_s;
+    blanking_distance_m = data_clean.hdr.setup.Blanking_distance_m;
     instrument_serial = data_clean.hdr.hardware_configuration.Serial_number;
     head_serial = data_clean.hdr.head_configuration.Serial_number;
     clean_status = 'clean';
@@ -262,6 +271,9 @@ else
                          end_date, ...
                          raw_bursts, ...
                          clean_bursts, ...
+                         fs_Hz, ...
+                         wave_burst_duration_s, ...
+                         blanking_distance_m, ...
                          mounting_height, ...
                          instrument_serial, ...
                          head_serial, ...
@@ -391,47 +403,5 @@ end
 
 %% Funciones auxiliares
 
-function check_required_functions(func_list, toolbox_name, opt_name)
-    missing = func_list(~cellfun(@(f) exist(f,'file') == 2, func_list));
-    if ~isempty(missing)
-        msg = sprintf(['No se encontraron funciones requeridas del toolbox %s en el path de MATLAB.\n' ...
-                       'Funciones faltantes: %s\n' ...
-                       'Agregue el path manualmente con addpath(...) o proporcione %s.'], ...
-                       toolbox_name, strjoin(missing, ', '), opt_name);
-        error('db_proc_camp:MissingDependencies', '%s', msg);
-    end
-end
 
-function txt_file = db_write_ncdisp_txt(ncfile)
-%db_write_ncdisp_txt - Guarda la salida de ncdisp en un archivo .txt.
-%
-%   txt_file = db_write_ncdisp_txt(ncfile)
-%
-%   Genera un archivo de texto en el mismo directorio del NetCDF con el
-%   contenido mostrado por ncdisp.
 
-    if ~isfile(ncfile)
-        txt_file = "";
-        return
-    end
-
-    [nc_dir, nc_name, ~] = fileparts(ncfile);
-    txt_file = fullfile(nc_dir, [nc_name, '_ncdisp.txt']);
-
-    nc_text = evalc('ncdisp(ncfile)');
-
-    fid = fopen(txt_file, 'w');
-
-    if fid == -1
-        warning('db_write_ncdisp_txt:FileOpenError', ...
-            'No se pudo crear el archivo ncdisp: %s', txt_file);
-        txt_file = "";
-        return
-    end
-
-    fprintf(fid, '%s', nc_text);
-    fclose(fid);
-
-    fprintf('\nArchivo ncdisp generado:\n%s\n', txt_file);
-
-end

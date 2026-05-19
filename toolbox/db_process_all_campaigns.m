@@ -40,15 +40,13 @@ end
 
 %Verificar que exista el directorio indicado de la base de datos
 if ~isfolder(db_dir)
-    error('db_process_all_campaigns:InvalidDbDir', ...
-        'El directorio de base de datos no existe: %s', db_dir);
+    error('El directorio de base de datos no existe: %s', db_dir);
 end
 
 %Verificar que exista el directorio /raw
 raw_dir = fullfile(db_dir, 'raw');
 if ~isfolder(raw_dir)
-    error('db_process_all_campaigns:MissingRawDir', ...
-        'No existe la carpeta raw: %s', raw_dir);
+    error('No existe la carpeta raw: %s', raw_dir);
 end
 
 %% Detectar campañas
@@ -56,8 +54,7 @@ end
 %Detectar campañas en /raw
 raw_campaigns_table = db_list_campaigns_raw(db_dir);
 if isempty(raw_campaigns_table)
-    warning('db_process_all_campaigns:NoCampaigns', ...
-        'No se detectaron campañas válidas en raw/.');
+    warning('No se detectaron campañas válidas en raw/.');
     results = table();
     return
 end
@@ -240,7 +237,8 @@ for i = 1:height(raw_campaigns_table)
         if opts.stop_on_error
             rethrow(ME)
         end
-
+        
+        close all;
     end
 
 end
