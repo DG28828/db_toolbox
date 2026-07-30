@@ -62,8 +62,8 @@ end
 req_wsa = {
     'wsa_awac_read'
     'wsa_awac_clean'
-    'wsa_awac_nc_write'
-    'wsa_awac_preprocess'
+    'wsa_nc_write'
+    'wsa_nc_preprocess'
     };
 
 % Verificar existencia de funciones
@@ -89,6 +89,45 @@ fprintf('Campaña : %s\n', Camp);
 fprintf('========================================================================================================================\n');
 
 try 
+
+
+%% Identificar tipo de instrumento basado en archivos crudos
+
+raw_dir = fullfile(db_dir, 'raw', Sitio, Camp, 'Raw_Data');
+
+awac_exts = {'.whd', '.wad'};
+aquadopp_exts = {'.dat', '.dia'};
+
+% Verificar AWAC
+has_awac = false;
+for i = 1:length(awac_exts)
+    archivos = dir(fullfile(raw_dir, ['*' awac_exts{i}]));
+    if ~isempty(archivos)
+        has_awac = true;
+        break;
+    end
+end
+
+% Verificar Aquadopp
+has_aquadopp = false;
+for i = 1:length(aquadopp_exts)
+    archivos = dir(fullfile(raw_dir, ['*' aquadopp_exts{i}]));
+    if ~isempty(archivos)
+        has_aquadopp = true;
+        break;
+    end
+end
+
+if ~has_awac && ~has_aquadopp
+    error('No existen los archivos requeridos para la lectura.')
+elseif has_awac && ~has_aquadopp
+    instrument_type = "AWAC";
+elseif ~has_awac && has_aquadopp
+    instrument_type = "AQUADOPP";
+else
+    error('Existen archivos para diversos instrumentos.')
+end
+
 %% Verificacion de altura de montaje del equipo
 
 % Verificar si se especificó mounting_height para la campaña en el archivo
@@ -123,7 +162,6 @@ raw_ncfile = fullfile(raw_nc_dir, [Sitio, '_', Camp, '_raw.nc']);
 processed_dir = fullfile(db_dir, 'processed', Sitio, Camp);
 proc_ncfile = fullfile(processed_dir, [Sitio, '_', Camp, '.nc']);
 
-
 %% Leer Raw Data y crear raw.nc
 
 %Verificar existencia de archivo raw.nc
@@ -144,15 +182,23 @@ else
                         
     
     %Leer datos crudos
-    data = wsa_awac_read(files_dir, ...                                         %Struct con datos leidos y quality check
-                        'do_plot', true, ...
-                        'save_plot_dir', save_plot_dir);
+    if instrument_type == "AWAC"
+        data = wsa_awac_read(files_dir, ...                                         %Struct con datos leidos y quality check
+                            'do_plot', true, ...
+                            'save_plot_dir', save_plot_dir);
+    elseif instrument_type == "AQUADOPP"
+        data = wsa_aquadopp_read(files_dir, ...                                         %Struct con datos leidos y quality check
+                            'do_plot', true, ...
+                            'save_plot_dir', save_plot_dir);
+    else
+        error('El tipo de instrumento no es una opción válida.')
+    end
     
     %Exportar a netCDF en carpeta raw_nc
     if ~exist(raw_nc_dir, 'dir')
         mkdir(raw_nc_dir);                                                      %Crea directorio para la campaña, en caso de no existir
     end
-    wsa_awac_nc_write(data, ...                                                 %Escribe el struct data en formato netCDF
+    wsa_nc_write(data, ...                                                 %Escribe el struct data en formato netCDF
                       raw_ncfile, ...
                       'site_name', Sitio, ...
                       'campaign_name', Camp, ...
@@ -224,13 +270,18 @@ else
     if isempty(data)
         fprintf('\nEl archivo raw.nc existe, pero se requiere limpiar nuevamente.\n');
         fprintf('Recuperando datos crudos desde raw.nc:\n%s\n', raw_ncfile);
-    
-        data_clean = wsa_awac_clean(raw_ncfile);
-
+        if instrument_type == "AWAC"
+            data_clean = wsa_awac_clean(raw_ncfile);
+        elseif instrument_type == "AQUADOPP"
+            data_clean = wsa_aquadopp_clean(raw_ncfile);
+        end
         info.clean_action = "created_nc_from_existing_raw_nc";
     else
-        data_clean = wsa_awac_clean(data);
-
+        if instrument_type == "AWAC"
+            data_clean = wsa_awac_clean(data);
+        elseif instrument_type == "AQUADOPP"
+            data_clean = wsa_aquadopp_clean(data);
+        end
         info.clean_action = "created_nc_from_raw_data";
     end
     
@@ -241,7 +292,7 @@ else
     end
     proc_ncfile = fullfile(processed_dir, ...                                  %Nombre del archivo netCDF: Sitio_Camp.nc
                             Camp , [Sitio, '_', Camp, '.nc']);
-    wsa_awac_nc_write(data_clean, ...                                           %Escribe el struct data en formato netCDF
+    wsa_nc_write(data_clean, ...                                           %Escribe el struct data en formato netCDF
                       proc_ncfile, ...
                       'site_name', Sitio, ...
                       'campaign_name', Camp, ...
@@ -290,11 +341,11 @@ if opts.preproc_flag
 
     if isfile(proc_ncfile)
         ncfile_to_process = proc_ncfile;
-        fprintf('\nPreprocesando archivo .nc con wsa_awac_preprocess:\n%s\n', ncfile_to_process);
+        fprintf('\nPreprocesando archivo .nc con wsa_nc_preprocess:\n%s\n', ncfile_to_process);
 
     else
         error('db_proc_camp:MissingNetCDF', ...
-            ['No existe .nc para ejecutar wsa_awac_preprocess.\n'
+            ['No existe .nc para ejecutar wsa_nc_preprocess.\n'
              'ncfile : %s'], ...
              proc_ncfile);
     end
@@ -307,7 +358,7 @@ if opts.preproc_flag
     end
 
     if ~preproc_status || opts.preproc_overwrite
-        proc_info = wsa_awac_preprocess(ncfile_to_process);
+        proc_info = wsa_nc_preprocess(ncfile_to_process);
 
         %Indicar en el archivo .nc que se preprocesó la campaña
         ncwriteatt(ncfile_to_process, '/', 'preprocessing_status', double(true));
@@ -322,14 +373,14 @@ if opts.preproc_flag
     else
         proc_info = [];
         info.preproc_action = "skipped_existing_preprocessing";
-        fprintf('\nEl archivo ya estaba preprocesado y preproc_overwrite=false. Se omite wsa_awac_preprocess.\n');
+        fprintf('\nEl archivo ya estaba preprocesado y preproc_overwrite=false. Se omite wsa_nc_preprocess.\n');
     end
 
 else
 
     proc_info = [];
     info.preproc_action = "disabled_by_preproc_flag";
-    fprintf('\npreproc_flag=false. Se omite wsa_awac_preprocess.\n');
+    fprintf('\npreproc_flag=false. Se omite wsa_nc_preprocess.\n');
 
 end
 

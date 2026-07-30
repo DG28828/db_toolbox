@@ -91,6 +91,8 @@ burst_data = db_read_burst_principal(proc_ncfile, 'all', 'IG', true);
 
 %% Definir tipo de datos de entrada a utilizar según InputType
 
+[test_Type, test_Type_IG, test_selection_info] = db_select_input_type(proc_ncfile, burst_data, opts.InputType, opts.IG_flag);
+
 nBursts = size(burst_data.processed.ast, 3);
 
 switch lower(opts.InputType)

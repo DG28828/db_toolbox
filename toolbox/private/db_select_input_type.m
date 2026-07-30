@@ -31,22 +31,22 @@ ast_bad = false(nBursts,1);
 
 if isfield(burst_data.processed, 'ast_bad_detects_percentage')
 
-    bad_pct = burst_data.processed.ast_bad_detects_percentage;
+    bad_detects_idx = burst_data.processed.ast_bad_detects_percentage;
 
-    if size(bad_pct,1) >= 1 && size(bad_pct,2) == nBursts
+    if size(bad_detects_idx,1) >= 1 && size(bad_detects_idx,2) == nBursts
 
         % Si el porcentaje no existe, no se considera el AST
         % suficientemente verificado para el modo optimum.
-        ast_bad = ~isfinite(bad_pct(1,:)).' | bad_pct(1,:).' > 10;
+        ast_bad = ~isfinite(bad_detects_idx(1,:)).' | bad_detects_idx(1,:).' > 10;
     end
 else
     ast_bad(:) = true;
 end
 
 %% Tilt mapeado desde burst_raw hasta burst limpio
-
-bad_tilt = read_clean_burst_flag(proc_ncfile, 'bad_tilt_flag', nBursts);
-
+if instrument_type == "AWAC"
+    bad_ast_tilt_10_idx = read_clean_burst_flag(proc_ncfile, 'warning_tilt_flag_10', nBursts);
+end
 %% Selección
 
 requested_type = lower(string(InputType));
@@ -55,12 +55,12 @@ switch requested_type
 
     case "optimum"
 
-        % La fuente segura por defecto es presión.
+        % Por defecto usar presión.
         Type = repmat("pressure", nBursts, 1);
 
         if instrument_type == "AWAC"
 
-            use_ast = ast_available & ~ast_bad & ~bad_tilt;
+            use_ast = ast_available & ~ast_bad & ~bad_ast_tilt_10_idx;
 
             Type(use_ast) = "ast";
         end
@@ -110,6 +110,33 @@ selection_info.instrument_type = instrument_type;
 selection_info.ast_available = ast_available;
 selection_info.pressure_available = pressure_available;
 selection_info.ast_bad = ast_bad;
-selection_info.bad_tilt = bad_tilt;
+if instrument_type == "AWAC"
+    selection_info.ast_bad_tilt = bad_ast_tilt_10_idx;
+end
+
+end
+
+function flag_clean = read_clean_burst_flag(ncfile, varname, nBursts)
+% Brinda los indices respecto a la dimensión clean de una variable definida
+% en dimensión raw.
+
+flag_raw = logical(ncread(ncfile, varname));
+flag_raw = flag_raw(:);
+
+is_bad_burst = logical(ncread(ncfile, 'is_bad_burst'));
+
+is_bad_burst = is_bad_burst(:);
+
+if numel(flag_raw) ~= numel(is_bad_burst)
+    error('%s contiene %d valores, pero is_bad_burst contiene %d.', varname, numel(flag_raw), numel(is_bad_burst));
+end
+
+good_raw_idx = find(~is_bad_burst);
+
+if numel(good_raw_idx) ~= nBursts
+    error('La máscara is_bad_burst indica %d bursts válidos, pero el archivo procesado contiene %d bursts.', numel(good_raw_idx), nBursts);
+end
+
+flag_clean = flag_raw(good_raw_idx);
 
 end
