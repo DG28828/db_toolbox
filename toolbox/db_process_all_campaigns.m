@@ -146,7 +146,7 @@ for i = 1:height(raw_campaigns_table)
         message = skip_reason;
 
     elseif opts.raw_overwrite && opts.clean_overwrite
-        action = "obreescribir_datos_crudos_y_limpiar";
+        action = "sobreescribir_datos_crudos_y_limpiar";
         message = "Se regenerará raw.nc desde Raw_Data, se regenerará clean.nc y se aplicará preprocesamiento si corresponde.";
 
     elseif opts.clean_overwrite && raw_nc_exists && ~opts.raw_overwrite

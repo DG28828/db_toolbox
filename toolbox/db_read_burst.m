@@ -1,15 +1,25 @@
-function burst_data = db_read_burst(ncfile, nburst)
+function burst_data = db_read_burst(ncfile, nburst, opts)
+
+arguments
+    ncfile 
+    nburst 
+    opts.IG = false;
+end
 
 if ~isfile(ncfile)
     error('El archivo no existe: %s', ncfile);
 end
 
 info_var = ncinfo(ncfile);
+att_names = string({info_var.Attributes.Name});
 dim_names = string({info_var.Dimensions.Name});
 dim_lens  = [info_var.Dimensions.Length];
 
 burst_dim_idx = find(dim_names == "burst", 1);
 nBurstsTotal = dim_lens(burst_dim_idx);
+
+% Detectar tipo de instrumento
+instrument_type = string(info_var.Attributes(find(att_names == "instrument_type")).Value);
 
 % --- Detectar modo ALL ---
 leer_todos = (nargin < 2) || isempty(nburst) || ...
@@ -30,12 +40,13 @@ if leer_todos
     % ===== LEER TODO =====
 
     %Generales del burst
+    burst_data.general.instrument_type  = instrument_type;
     burst_data.general.time             = db_posix2datetime(ncread(ncfile, 'time'));
     burst_data.general.burst_counter    = ncread(ncfile, 'burst_counter');
     burst_data.general.ast_mean         = ncread(ncfile, 'ast_mean');
     burst_data.general.cell_position    = ncread(ncfile, 'cell_position');
     burst_data.general.mounting_height  = ncreadatt(ncfile, '/', 'mounting_height_m');
-    burst_data.general.fs               = ncreadatt(ncfile, '/', 'wave_sampling_rate_Hz');
+    burst_data.general.fs               = ncreadatt(ncfile, '/', 'sampling_rate_Hz');
     
     %Tiempo
     burst_data.time.burst_time          = db_posix2datetime(ncread(ncfile, 'burst_time'));
@@ -54,11 +65,18 @@ if leer_todos
     burst_data.processed.ast_quality    = ncread(ncfile, 'ast_quality');
     burst_data.processed.ast_bad_detects = ncread(ncfile, 'ast_bad_detects');
     burst_data.processed.ast_bad_detects_percentage = ncread(ncfile, 'ast_bad_detects_percentage');
-
+    
+    if opts.IG
+        burst_data.processed.pressure_ig       = ncread(ncfile, 'pressure_proc_IG');
+        burst_data.processed.ast_ig            = ncread(ncfile, 'ast_proc_IG');
+        burst_data.processed.ast_comb_ig       = ncread(ncfile, 'ast_proc_comb_IG');
+        burst_data.processed.velocity_enu_ig   = ncread(ncfile, 'velocity_proc_IG');
+    end
 else
     % ===== UN SOLO BURST =====
 
     %Generales del burst
+    burst_data.general.instrument_type  = instrument_type;
     burst_data.general.time             = db_posix2datetime(ncread(ncfile, 'time', nburst, 1));
     burst_data.general.burst_counter    = ncread(ncfile, 'burst_counter', nburst, 1);
     burst_data.general.ast_mean         = ncread(ncfile, 'ast_mean', nburst, 1);
@@ -78,10 +96,16 @@ else
     %Datos procesados (despiking en AST y filtrado)
     burst_data.processed.pressure       = ncread(ncfile, 'pressure_proc', [1, nburst], [Inf, 1]);
     burst_data.processed.ast            = ncread(ncfile, 'ast_proc', [1, 1, nburst], [Inf, Inf, 1]);
-    burst_data.processed.ast_comb       = ncread(ncfile, 'ast_proc_comb', [1, 1, nburst], [Inf, Inf, 1]);
+    burst_data.processed.ast_comb       = ncread(ncfile, 'ast_proc_comb', [1, nburst], [Inf, 1]);
     burst_data.processed.velocity_enu   = ncread(ncfile, 'velocity_proc', [1, 1, nburst], [Inf, Inf, 1]);
     burst_data.processed.ast_quality    = ncread(ncfile, 'ast_quality', [1, nburst], [Inf, 1]);
     burst_data.processed.ast_bad_detects = ncread(ncfile, 'ast_bad_detects', [1, nburst], [Inf, 1]);
     burst_data.processed.ast_bad_detects_percentage = ncread(ncfile, 'ast_bad_detects_percentage', [1, nburst], [Inf, 1]);
-
+    
+    if opts.IG
+        burst_data.processed.pressure_ig       = ncread(ncfile, 'pressure_proc_IG', [1, nburst], [Inf, 1]);
+        burst_data.processed.ast_ig            = ncread(ncfile, 'ast_proc_IG', [1, 1, nburst], [Inf, Inf, 1]);
+        burst_data.processed.ast_comb_ig       = ncread(ncfile, 'ast_proc_comb_IG', [1, nburst], [Inf, 1]);
+        burst_data.processed.velocity_enu_ig   = ncread(ncfile, 'velocity_proc_IG', [1, 1, nburst], [Inf, Inf, 1]);
+    end
 end
