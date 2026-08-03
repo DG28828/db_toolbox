@@ -61,10 +61,12 @@ end
 % Funciones mínimas requeridas del toolbox WSA
 req_wsa = {
     'wsa_awac_read'
+    'wsa_aquadopp_read'
     'wsa_awac_clean'
+    'wsa_aquadopp_clean'
     'wsa_nc_write'
     'wsa_nc_preprocess'
-    };
+};
 
 % Verificar existencia de funciones
 db_check_required_functions(req_wsa, 'WSA', 'opts.wsa_toolbox_dir');
@@ -118,14 +120,14 @@ for i = 1:length(aquadopp_exts)
     end
 end
 
-if ~has_awac && ~has_aquadopp
-    error('No existen los archivos requeridos para la lectura.')
-elseif has_awac && ~has_aquadopp
+if has_awac && has_aquadopp
+    error('La carpeta contiene simultáneamente archivos AWAC y AQUADOPP.');
+elseif has_awac
     instrument_type = "AWAC";
-elseif ~has_awac && has_aquadopp
+elseif has_aquadopp
     instrument_type = "AQUADOPP";
 else
-    error('Existen archivos para diversos instrumentos.')
+    error('No fue posible identificar el instrumento.');
 end
 
 %% Verificacion de altura de montaje del equipo
@@ -171,7 +173,7 @@ if raw_exists && ~opts.raw_overwrite
 
     fprintf('\nYa existe raw.nc y raw_overwrite=false. Se omite lectura de Raw_Data.\n');
     fprintf('Archivo existente: %s\n', raw_ncfile);
-    data = [];
+    data = [];  
 
     info.raw_action = "skipped_existing_raw_nc";
 
@@ -182,16 +184,17 @@ else
                         
     
     %Leer datos crudos
-    if instrument_type == "AWAC"
-        data = wsa_awac_read(files_dir, ...                                         %Struct con datos leidos y quality check
-                            'do_plot', true, ...
-                            'save_plot_dir', save_plot_dir);
-    elseif instrument_type == "AQUADOPP"
-        data = wsa_aquadopp_read(files_dir, ...                                         %Struct con datos leidos y quality check
-                            'do_plot', true, ...
-                            'save_plot_dir', save_plot_dir);
-    else
-        error('El tipo de instrumento no es una opción válida.')
+    switch instrument_type
+        case "AWAC"
+            data = wsa_awac_read(files_dir, ...                                         %Struct con datos leidos y quality check
+                                'do_plot', true, ...
+                                'save_plot_dir', save_plot_dir);
+        case "AQUADOPP"
+            data = wsa_aquadopp_read(files_dir, ...                                         %Struct con datos leidos y quality check
+                                'do_plot', true, ...
+                                'save_plot_dir', save_plot_dir);
+        otherwise
+            error('El tipo de instrumento no es una opción válida.')
     end
     
     %Exportar a netCDF en carpeta raw_nc
@@ -214,10 +217,10 @@ else
     fprintf('\nRegistrando campaña en archivo de metadatos de campaña: metadata\\campaign.csv\n')
     start_date = data.quality.summary.time_start;
     end_date = data.quality.summary.time_end;
-    raw_bursts = data.quality.summary.total_bursts;
+    raw_bursts = ncreadatt(raw_ncfile, '/', 'number_of_bursts');
     clean_bursts = [];
-    fs_Hz = data.hdr.setup.Wave_Sampling_rate_Hz;
-    wave_burst_duration_s = data.hdr.setup.Wave_burst_duration_s;
+    fs_Hz = ncreadatt(raw_ncfile, '/', 'sampling_rate_Hz');
+    burst_duration_s = ncreadatt(raw_ncfile, '/', 'burst_duration_s');
     blanking_distance_m = data.hdr.setup.Blanking_distance_m;
     instrument_serial = data.hdr.hardware_configuration.Serial_number;
     head_serial = data.hdr.head_configuration.Serial_number;
@@ -233,7 +236,7 @@ else
                          raw_bursts, ...
                          clean_bursts, ...
                          fs_Hz, ...
-                         wave_burst_duration_s, ...
+                         burst_duration_s, ...
                          blanking_distance_m, ...
                          mounting_height, ...
                          instrument_serial, ...
@@ -270,11 +273,18 @@ else
     if isempty(data)
         fprintf('\nEl archivo raw.nc existe, pero se requiere limpiar nuevamente.\n');
         fprintf('Recuperando datos crudos desde raw.nc:\n%s\n', raw_ncfile);
-        if instrument_type == "AWAC"
-            data_clean = wsa_awac_clean(raw_ncfile);
-        elseif instrument_type == "AQUADOPP"
-            data_clean = wsa_aquadopp_clean(raw_ncfile);
+
+        instrument_type = upper(string(ncreadatt(raw_ncfile, '/', 'instrument_type')));
+
+        switch instrument_type
+            case "AWAC"
+                data_clean = wsa_awac_clean(raw_ncfile);
+            case "AQUADOPP"
+                data_clean = wsa_aquadopp_clean(raw_ncfile);
+            otherwise
+                error('El tipo de instrumento no es una opción válida.')
         end
+
         info.clean_action = "created_nc_from_existing_raw_nc";
     else
         if instrument_type == "AWAC"
@@ -304,10 +314,10 @@ else
     fprintf('\nRegistrando campaña en archivo de metadatos de campaña: metadata\\campaign.csv\n')
     start_date = data_clean.cleaning.time_start;
     end_date = data_clean.cleaning.time_end;
-    raw_bursts = data_clean.quality.summary.total_bursts;
+    raw_bursts = ncreadatt(raw_ncfile, '/', 'number_of_bursts');
     clean_bursts = data_clean.cleaning.Number_of_wave_measurements;
-    fs_Hz = data_clean.hdr.setup.Wave_Sampling_rate_Hz;
-    wave_burst_duration_s = data_clean.hdr.setup.Wave_burst_duration_s;
+    fs_Hz = ncreadatt(raw_ncfile, '/', 'sampling_rate_Hz');
+    burst_duration_s = ncreadatt(raw_ncfile, '/', 'burst_duration_s');
     blanking_distance_m = data_clean.hdr.setup.Blanking_distance_m;
     instrument_serial = data_clean.hdr.hardware_configuration.Serial_number;
     head_serial = data_clean.hdr.head_configuration.Serial_number;
@@ -323,7 +333,7 @@ else
                          raw_bursts, ...
                          clean_bursts, ...
                          fs_Hz, ...
-                         wave_burst_duration_s, ...
+                         burst_duration_s, ...
                          blanking_distance_m, ...
                          mounting_height, ...
                          instrument_serial, ...
