@@ -130,7 +130,7 @@ for i = 1:height(raw_campaigns_table)
     preproc_status_nc = false;
     if proc_nc_exists
         try
-            preproc_status_nc = logical(ncreadatt(clean_ncfile, '/', 'preprocessing_status'));
+            preproc_status_nc = logical(ncreadatt(proc_ncfile, '/', 'preprocessing_status'));
         catch
             preproc_status_nc = false;
         end

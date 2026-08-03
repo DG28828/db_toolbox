@@ -89,49 +89,28 @@ end
 %% Leer datos de la campaña del archivo netCDF
 
 %Extraer datos de la campaña
-burst_data = db_read_burst_principal(proc_ncfile, 'all', 'IG', true);
+burst_data = db_read_burst_principal(proc_ncfile, 'all', 'IG', opts.IG_flag);
 
 %% Definir tipo de datos de entrada a utilizar según InputType
 
-nBursts = size(burst_data.processed.ast, 3);
+nBursts = size(burst_data.processed.pressure, 2);
 
-switch lower(opts.InputType)
-    case 'optimum'
-        
-        %Inicializar tipos AST por defecto
-        Type = repmat("ast", nBursts, 1);
-
-        %Cambiar InputTypes en los que AST da problemas según criterios:
-
-        %   1) Porcentaje de bad detects mayor al 10 % (ast_bad_detects_percentage > 10 %)
-        bad_detects_idx = burst_data.processed.ast_bad_detects_percentage > 10;
-        Type(bad_detects_idx(1, :)) = "pressure";
-
-        %   2) Tilt mayor a 10° (bad_tilt_flag)
-        bad_tilt_flag_raw = ncread(proc_ncfile, 'bad_tilt_flag');  %Esta bandera esta respecto a burst_raw
-        burst_counter = burst_data.general.burst_counter;
-        bad_tilt_idx = logical(bad_tilt_flag_raw(burst_counter));
-        Type(bad_tilt_idx) = "pressure";
-
-    case 'ast'
-        Type = repmat("ast", nBursts, 1);
-
-    case 'pressure'
-        Type = repmat("pressure", nBursts, 1);
-
-    otherwise
-        error('InputType no reconocido: %s', opts.InputType);
-end
+[Type, Type_IG, selection_info] = db_select_input_type(proc_ncfile, burst_data, opts.InputType, opts.IG_flag);
 
 %% Ciclo principal
 
 %Variables preliminares
-ast_mean = burst_data.general.ast_mean;
-mounting_height = burst_data.general.mounting_height;
-z_p = -(ast_mean);
-h   = ast_mean + mounting_height;
-z_v = burst_data.general.cell_position - ast_mean;
+z_p = burst_data.general.z_p;
+z_v = burst_data.general.z_v;
+h   = burst_data.general.h;
 fs = burst_data.general.fs;
+
+% Validación
+invalid_geometry = ~isfinite(h) | ~isfinite(z_v);
+invalid_geometry(Type == "pressure") = invalid_geometry(Type == "pressure") | ~isfinite(z_p(Type == "pressure"));
+if any(invalid_geometry)
+    error('Geometría inválida para procesamiento direccional en los bursts: %s', mat2str(find(invalid_geometry).'));
+end
 
 
 for b = 1:nBursts
@@ -155,7 +134,7 @@ for b = 1:nBursts
         case "ast"
             fprintf('\nCalculando espectro direccional basado en AST para burst %d\n', b);
             [out_dirspectrum, info_dirspectrum] = wsa_dirspectrum( ...
-                detrend(AST1), ...
+                AST1, ...
                 U, ...
                 V, ...
                 fs, ...
@@ -168,7 +147,7 @@ for b = 1:nBursts
             if opts.IG_flag
                 fprintf('\nCalculando espectro direccional IG basado en AST para burst %d\n', b);
                 [out_IG_dirspectrum, info_IG_dirspectrum] = wsa_dirspectrum( ...
-                    detrend(AST1_ig), ...
+                    AST1_ig, ...
                     U_ig, ...
                     V_ig, ...
                     fs, ...

@@ -98,7 +98,7 @@ try
 raw_dir = fullfile(db_dir, 'raw', Sitio, Camp, 'Raw_Data');
 
 awac_exts = {'.whd', '.wad'};
-aquadopp_exts = {'.dat', '.dia'};
+aquadopp_exts = {'.dia'};
 
 % Verificar AWAC
 has_awac = false;

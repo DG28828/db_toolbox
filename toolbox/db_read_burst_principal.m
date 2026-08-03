@@ -14,6 +14,8 @@ info_var = ncinfo(ncfile);
 dim_names = string({info_var.Dimensions.Name});
 dim_lens  = [info_var.Dimensions.Length];
 
+att_names = string({info_var.Attributes.Name});
+
 burst_dim_idx = find(dim_names == "burst", 1);
 nBurstsTotal = dim_lens(burst_dim_idx);
 
@@ -41,11 +43,17 @@ if leer_todos
     %Generales del burst
     burst_data_principal.general.instrument_type  = instrument_type;
     burst_data_principal.general.time             = db_posix2datetime(ncread(ncfile, 'time'));
-    burst_data_principal.general.burst_counter    = ncread(ncfile, 'burst_counter');
-    burst_data_principal.general.ast_mean         = ncread(ncfile, 'ast_mean');
-    burst_data_principal.general.cell_position    = ncread(ncfile, 'cell_position');
+    burst_data_principal.general.fs               = ncreadatt(ncfile, '/', 'sampling_rate_Hz');
     burst_data_principal.general.mounting_height  = ncreadatt(ncfile, '/', 'mounting_height_m');
-    burst_data_principal.general.fs                         = ncreadatt(ncfile, '/', 'sampling_rate_Hz');
+    burst_data_principal.general.h                = ncread(ncfile, 'h');
+    burst_data_principal.general.z_p              = ncread(ncfile, 'z_p');
+    burst_data_principal.general.z_v              = ncread(ncfile, 'z_v');
+    burst_data_principal.general.cell_position    = ncread(ncfile, 'cell_position');
+    burst_data_principal.general.pressure_mean    = ncread(ncfile, 'pressure_mean');
+    burst_data_principal.general.ast_mean         = ncread(ncfile, 'ast_mean');
+    
+    
+    
     
     %Tiempo
     burst_data_principal.time.burst_time          = db_posix2datetime(ncread(ncfile, 'burst_time'));
@@ -72,11 +80,15 @@ else
     %Generales del burst
     burst_data_principal.general.instrument_type  = instrument_type;
     burst_data_principal.general.time             = db_posix2datetime(ncread(ncfile, 'time', nburst, 1));
-    burst_data_principal.general.burst_counter    = ncread(ncfile, 'burst_counter', nburst, 1);
-    burst_data_principal.general.ast_mean         = ncread(ncfile, 'ast_mean', nburst, 1);
-    burst_data_principal.general.cell_position    = ncread(ncfile, 'cell_position', nburst, 1);
+    burst_data_principal.general.fs               = ncreadatt(ncfile, '/', 'sampling_rate_Hz');
     burst_data_principal.general.mounting_height  = ncread(ncfile, 'mounting_height_m');
-    burst_data_principal.general.fs                         = ncreadatt(ncfile, '/', 'wave_sampling_rate_Hz');
+    burst_data_principal.general.h                = ncread(ncfile, 'h', nburst, 1);
+    burst_data_principal.general.z_p              = ncread(ncfile, 'z_p', nburst, 1);
+    burst_data_principal.general.z_v              = ncread(ncfile, 'z_v', nburst, 1);
+    burst_data_principal.general.cell_position    = ncread(ncfile, 'cell_position', nburst, 1);
+    burst_data_principal.general.pressure_mean    = ncread(ncfile, 'pressure_mean', nburst, 1);
+    burst_data_principal.general.ast_mean         = ncread(ncfile, 'ast_mean', nburst, 1);
+    
     
     %Tiempo
     burst_data_principal.time.burst_time          = db_posix2datetime(ncread(ncfile, 'burst_time', [1, nburst], [Inf, 1]));

@@ -84,54 +84,35 @@ if ~is_preprocessed
     error('El archivo %s no se encuentra preprocesado', proc_ncfile);
 end
 
+IG_preprocessed = logical(ncreadatt(proc_ncfile, '/', 'preprocessing_IG_filter_flag'));
+if ~IG_preprocessed
+    error('Se solicitó procesamiento IG, pero el archivo base no fue preprocesado en la banda IG.');
+end
+
 %% Leer datos de la campaña del archivo netCDF
 
 %Extraer datos de la campaña
-burst_data = db_read_burst_principal(proc_ncfile, 'all', 'IG', true);
+burst_data = db_read_burst_principal(proc_ncfile, 'all', 'IG', opts.IG_flag);
 
 %% Definir tipo de datos de entrada a utilizar según InputType
 
-[test_Type, test_Type_IG, test_selection_info] = db_select_input_type(proc_ncfile, burst_data, opts.InputType, opts.IG_flag);
+nBursts = size(burst_data.processed.pressure, 2);
 
-nBursts = size(burst_data.processed.ast, 3);
-
-switch lower(opts.InputType)
-    case 'optimum'
-        
-        %Inicializar tipos AST por defecto
-        Type = repmat("ast", nBursts, 1);
-
-        %Cambiar InputTypes en los que AST da problemas según criterios:
-
-        %   1) Porcentaje de bad detects mayor al 10 % (ast_bad_detects_percentage > 10 %)
-        bad_detects_idx = burst_data.processed.ast_bad_detects_percentage > 10;
-        Type(bad_detects_idx(1, :)) = "pressure";
-
-        %   2) Tilt mayor a 10° (warning_tilt_flag_10)
-        ast_bad_tilt_flag_raw = ncread(proc_ncfile, 'warning_tilt_flag_10');  %Esta bandera esta respecto a burst_raw
-        burst_counter = burst_data.general.burst_counter;
-        ast_bad_tilt_idx = logical(ast_bad_tilt_flag_raw(burst_counter));
-        Type(ast_bad_tilt_idx) = "pressure";
-
-    case 'ast'
-        Type = repmat("ast", nBursts, 1);
-
-    case 'pressure'
-        Type = repmat("pressure", nBursts, 1);
-
-    otherwise
-        error('InputType no reconocido: %s', opts.InputType);
-end
+[Type, Type_IG, selection_info] = db_select_input_type(proc_ncfile, burst_data, opts.InputType, opts.IG_flag);
 
 %% Ciclo principal
 
 %Variables preliminares
-ast_mean = burst_data.general.ast_mean;
-mounting_height = burst_data.general.mounting_height;
-z_p = -(ast_mean);
-h   = ast_mean + mounting_height;
+z_p = burst_data.general.z_p;
+h   = burst_data.general.h;
 fs = burst_data.general.fs;
 
+% Validación
+pressure_idx = Type == "pressure";
+if any(pressure_idx & (~isfinite(z_p) | ~isfinite(h)))
+    bad_idx = find(pressure_idx & (~isfinite(z_p) | ~isfinite(h)));
+    error('Geometría inválida para procesamiento por presión en los bursts: %s', mat2str(bad_idx(:).'));
+end
 
 
 for b = 1:nBursts
@@ -152,7 +133,7 @@ for b = 1:nBursts
             % Espectro frecuencial AST
             fprintf('\nCalculando espectro frecuencial basado en AST para burst %d\n', b);
             [out_spectrum, info_spectrum] = wsa_spectrum( ...
-                                                        detrend(AST1), ...
+                                                        AST1, ...
                                                         fs, ...
                                                         'DoF', opts.SpecDoF, ...
                                                         'printFlag', 0);
@@ -160,7 +141,7 @@ for b = 1:nBursts
             if opts.IG_flag
                 fprintf('\nCalculando espectro frecuencial IG basado en AST para burst %d\n', b);
                 [out_IG_spectrum, info_IG_spectrum] = wsa_spectrum( ...
-                                                            detrend(AST1_ig), ...
+                                                            AST1_ig, ...
                                                             fs, ...
                                                             'DoF', opts.IGSpecDoF, ...
                                                             'printFlag', 0);
@@ -409,7 +390,7 @@ wsa_nc_create_var(spectral_tmpfile, ...
     'time', ...
     {'burst', nBurst}, ...
     'double', ...
-    'units', 'seconds since 1970-01-01 00:00:00 UTC-06:00', ...
+    'units', 'seconds since 1970-01-01 00:00:00 UTC', ...
     'long_name', 'tiempo inicial');
 
 wsa_nc_create_var(spectral_tmpfile, ...
@@ -569,6 +550,7 @@ safe_ncwriteatt(spectral_tmpfile, '/', 'source_file', proc_ncfile);
 safe_ncwriteatt(spectral_tmpfile, '/', 'processing_time_UTC-6', char(datetime('now', 'TimeZone', 'America/Costa_Rica', 'Format', 'yyyy-MM-dd''T''HH:mm:ssZZ')));
 safe_ncwriteatt(spectral_tmpfile, '/', 'Sitio', Sitio);
 safe_ncwriteatt(spectral_tmpfile, '/', 'Camp', Camp);
+safe_ncwriteatt(spectral_tmpfile, '/', 'instrument_type', char(selection_info.instrument_type));
 safe_ncwriteatt(spectral_tmpfile, '/', 'InputType', opts.InputType);
 safe_ncwriteatt(spectral_tmpfile, '/', 'SpecDoF_requested', opts.SpecDoF);
 if opts.IG_flag
