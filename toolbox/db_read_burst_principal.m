@@ -18,7 +18,7 @@ burst_dim_idx = find(dim_names == "burst", 1);
 nBurstsTotal = dim_lens(burst_dim_idx);
 
 % Detectar tipo de instrumento
-instrument_type = string(info_var.Attributes(find(att_names == "instrument_type")).Value);
+%instrument_type = string(info_var.Attributes(find(att_names == "instrument_type")).Value);
 
 % --- Detectar modo ALL ---
 leer_todos = (nargin < 2) || isempty(nburst) || ...
@@ -39,13 +39,13 @@ if leer_todos
     % ===== LEER TODO =====
 
     %Generales del burst
-    burst_data_principal.general.instrument_type  = instrument_type;
+    %burst_data_principal.general.instrument_type  = instrument_type;
     burst_data_principal.general.time             = db_posix2datetime(ncread(ncfile, 'time'));
     burst_data_principal.general.burst_counter    = ncread(ncfile, 'burst_counter');
     burst_data_principal.general.ast_mean         = ncread(ncfile, 'ast_mean');
     burst_data_principal.general.cell_position    = ncread(ncfile, 'cell_position');
     burst_data_principal.general.mounting_height  = ncreadatt(ncfile, '/', 'mounting_height_m');
-    burst_data_principal.general.fs                         = ncreadatt(ncfile, '/', 'sampling_rate_Hz');
+    burst_data_principal.general.fs                         = ncreadatt(ncfile, '/', 'wave_sampling_rate_Hz');
     
     %Tiempo
     burst_data_principal.time.burst_time          = db_posix2datetime(ncread(ncfile, 'burst_time'));
@@ -70,7 +70,7 @@ else
     % ===== UN SOLO BURST =====
 
     %Generales del burst
-    burst_data_principal.general.instrument_type  = instrument_type;
+    %burst_data_principal.general.instrument_type  = instrument_type;
     burst_data_principal.general.time             = db_posix2datetime(ncread(ncfile, 'time', nburst, 1));
     burst_data_principal.general.burst_counter    = ncread(ncfile, 'burst_counter', nburst, 1);
     burst_data_principal.general.ast_mean         = ncread(ncfile, 'ast_mean', nburst, 1);
