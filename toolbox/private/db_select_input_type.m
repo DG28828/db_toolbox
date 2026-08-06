@@ -21,7 +21,7 @@ end
 
 ast_available = any(isfinite(ast1), 1).';
 
-if instrument_type == "AQUADOPP"
+if instrument_type == "AQUADOPP" || instrument_type == "RBR"
     ast_available(:) = false;
 end
 

@@ -81,7 +81,7 @@ else
     burst_data_principal.general.instrument_type  = instrument_type;
     burst_data_principal.general.time             = db_posix2datetime(ncread(ncfile, 'time', nburst, 1));
     burst_data_principal.general.fs               = ncreadatt(ncfile, '/', 'sampling_rate_Hz');
-    burst_data_principal.general.mounting_height  = ncread(ncfile, 'mounting_height_m');
+    burst_data_principal.general.mounting_height  = ncreadatt(ncfile, '/', 'mounting_height_m');
     burst_data_principal.general.h                = ncread(ncfile, 'h', nburst, 1);
     burst_data_principal.general.z_p              = ncread(ncfile, 'z_p', nburst, 1);
     burst_data_principal.general.z_v              = ncread(ncfile, 'z_v', nburst, 1);
@@ -97,7 +97,7 @@ else
     %Datos procesados (despiking en AST y filtrado)
     burst_data_principal.processed.pressure       = ncread(ncfile, 'pressure_proc', [1, nburst], [Inf, 1]);
     burst_data_principal.processed.ast            = ncread(ncfile, 'ast_proc', [1, 1, nburst], [Inf, Inf, 1]);
-    burst_data_principal.processed.ast_comb       = ncread(ncfile, 'ast_proc_comb', [1, 1, nburst], [Inf, Inf, 1]);
+    burst_data_principal.processed.ast_comb       = ncread(ncfile, 'ast_proc_comb', [1, nburst], [Inf, 1]);
     burst_data_principal.processed.velocity_enu   = ncread(ncfile, 'velocity_proc', [1, 1, nburst], [Inf, Inf, 1]);
     burst_data_principal.processed.ast_quality    = ncread(ncfile, 'ast_quality', [1, nburst], [Inf, 1]);
     burst_data_principal.processed.ast_bad_detects = ncread(ncfile, 'ast_bad_detects', [1, nburst], [Inf, 1]);

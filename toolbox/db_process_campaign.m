@@ -62,8 +62,12 @@ end
 req_wsa = {
     'wsa_awac_read'
     'wsa_aquadopp_read'
+    'wsa_rbr_read'
+
     'wsa_awac_clean'
     'wsa_aquadopp_clean'
+    'wsa_rbr_clean'
+
     'wsa_nc_write'
     'wsa_nc_preprocess'
 };
@@ -93,42 +97,71 @@ fprintf('=======================================================================
 try 
 
 
-%% Identificar tipo de instrumento basado en archivos crudos
+%% Identificar tipo de instrumento
 
 raw_dir = fullfile(db_dir, 'raw', Sitio, Camp, 'Raw_Data');
+raw_nc_dir = fullfile(db_dir, 'raw_nc', Sitio, Camp);
+raw_ncfile = fullfile(raw_nc_dir, [Sitio, '_', Camp, '_raw.nc']);
 
-awac_exts = {'.whd', '.wad'};
-aquadopp_exts = {'.dia'};
+raw_exists = isfile(raw_ncfile);
 
-% Verificar AWAC
-has_awac = false;
-for i = 1:length(awac_exts)
-    archivos = dir(fullfile(raw_dir, ['*' awac_exts{i}]));
-    if ~isempty(archivos)
-        has_awac = true;
-        break;
+if raw_exists && ~opts.raw_overwrite
+
+    % Cuando se utilizará raw.nc, la fuente es su atributo.
+    instrument_type = upper(string(ncreadatt(raw_ncfile, '/', 'instrument_type')));
+
+    if ~ismember(instrument_type, ["AWAC", "AQUADOPP", "RBR"])
+        error('El archivo raw.nc contiene un tipo de instrumento no reconocido: "%s".', instrument_type);
     end
-end
 
-% Verificar Aquadopp
-has_aquadopp = false;
-for i = 1:length(aquadopp_exts)
-    archivos = dir(fullfile(raw_dir, ['*' aquadopp_exts{i}]));
-    if ~isempty(archivos)
-        has_aquadopp = true;
-        break;
-    end
-end
-
-if has_awac && has_aquadopp
-    error('La carpeta contiene simultáneamente archivos AWAC y AQUADOPP.');
-elseif has_awac
-    instrument_type = "AWAC";
-elseif has_aquadopp
-    instrument_type = "AQUADOPP";
 else
-    error('No fue posible identificar el instrumento.');
+    if ~isfolder(raw_dir)
+        error('No existe el directorio de datos crudos:\n%s', raw_dir);
+    end
+
+    % AWAC requiere ambos archivos principales.
+    has_awac = ~isempty(dir(fullfile(raw_dir, '*.whd'))) && ~isempty(dir(fullfile(raw_dir, '*.wad')));
+
+    % AQUADOPP.
+    has_aquadopp = ~isempty(dir(fullfile(raw_dir, '*.dia')));
+
+    % RBR requiere exactamente los dos archivos utilizados por el lector.
+    rbr_burst_files = dir(fullfile(raw_dir, '*_burst.txt'));
+    rbr_metadata_files = dir(fullfile(raw_dir, '*_metadata.txt'));
+
+    has_rbr = isscalar(rbr_burst_files) && isscalar(rbr_metadata_files);
+
+    instrument_flags = [
+        has_awac
+        has_aquadopp
+        has_rbr
+    ];
+
+    if nnz(instrument_flags) > 1
+        error('La carpeta Raw_Data contiene archivos correspondientes a más de un tipo de instrumento.');
+
+    elseif has_awac
+        instrument_type = "AWAC";
+
+    elseif has_aquadopp
+        instrument_type = "AQUADOPP";
+
+    elseif has_rbr
+        instrument_type = "RBR";
+
+    else
+
+        error(['No fue posible identificar el instrumento.\n' ...
+               'Se esperaba:\n' ...
+               '  AWAC: *.whd y *.wad\n' ...
+               '  AQUADOPP: *.dia\n' ...
+               '  RBR: *_burst.txt y *_metadata.txt']);
+    end
 end
+
+info.instrument_type = instrument_type;
+
+fprintf('\nInstrumento: %s.\n', instrument_type);
 
 %% Verificacion de altura de montaje del equipo
 
@@ -186,11 +219,15 @@ else
     %Leer datos crudos
     switch instrument_type
         case "AWAC"
-            data = wsa_awac_read(files_dir, ...                                         %Struct con datos leidos y quality check
+            data = wsa_awac_read(files_dir, ...                                    
                                 'do_plot', true, ...
                                 'save_plot_dir', save_plot_dir);
         case "AQUADOPP"
-            data = wsa_aquadopp_read(files_dir, ...                                         %Struct con datos leidos y quality check
+            data = wsa_aquadopp_read(files_dir, ...                                  
+                                'do_plot', true, ...
+                                'save_plot_dir', save_plot_dir);
+        case "RBR"
+            data = wsa_rbr_read(files_dir, ...
                                 'do_plot', true, ...
                                 'save_plot_dir', save_plot_dir);
         otherwise
@@ -277,21 +314,38 @@ else
         instrument_type = upper(string(ncreadatt(raw_ncfile, '/', 'instrument_type')));
 
         switch instrument_type
+
             case "AWAC"
                 data_clean = wsa_awac_clean(raw_ncfile);
+
             case "AQUADOPP"
                 data_clean = wsa_aquadopp_clean(raw_ncfile);
+
+            case "RBR"
+                error('En la versión actual no se ha implementado la limpieza mediante raw_ncfile existente')
+                %data_clean = wsa_rbr_clean(raw_ncfile);
+
             otherwise
                 error('El tipo de instrumento no es una opción válida.')
         end
 
         info.clean_action = "created_nc_from_existing_raw_nc";
     else
-        if instrument_type == "AWAC"
-            data_clean = wsa_awac_clean(data);
-        elseif instrument_type == "AQUADOPP"
-            data_clean = wsa_aquadopp_clean(data);
+        switch instrument_type
+
+            case "AWAC"
+                data_clean = wsa_awac_clean(data);
+
+            case "AQUADOPP"
+                data_clean = wsa_aquadopp_clean(data);
+
+            case "RBR"
+                data_clean = wsa_rbr_clean(data);
+    
+            otherwise
+                error('El tipo de instrumento "%s" no es válido.', instrument_type);
         end
+        
         info.clean_action = "created_nc_from_raw_data";
     end
     

@@ -89,12 +89,50 @@ if ~IG_preprocessed
     error('Se solicitó procesamiento IG, pero el archivo base no fue preprocesado en la banda IG.');
 end
 
+if opts.IG_flag
+    IG_preprocessed = logical(ncreadatt(proc_ncfile, '/', 'preprocessing_IG_filter_flag'));
+    if ~IG_preprocessed
+        error('Se solicitó procesamiento IG, pero el archivo base no fue preprocesado en la banda IG.');
+    end
+end
+
+%% Verificar tipo de instrumento
+instrument_type = upper(string(ncreadatt( proc_ncfile, '/', 'instrument_type')));
+
+if ~ismember(instrument_type, ["AWAC", "AQUADOPP", "RBR"])
+    error('Tipo de instrumento no reconocido en el archivo: "%s".', instrument_type);
+end
+
+is_rbr = instrument_type == "RBR";
+
 %% Leer datos de la campaña del archivo netCDF
 
 %Extraer datos de la campaña
 burst_data = db_read_burst_principal(proc_ncfile, 'all', 'IG', opts.IG_flag);
 
 %% Definir tipo de datos de entrada a utilizar según InputType
+
+input_type = ...
+    lower(string(opts.InputType));
+
+if is_rbr
+
+    switch input_type
+
+        case "optimum"
+            input_type = "pressure";
+            fprintf('\nInputType="optimum": para RBR se utilizará presión.\n');
+
+        case "pressure"
+            % Opción válida.
+
+        case "ast"
+            error('El instrumento RBR no dispone de AST. Utilice InputType="pressure" u "optimum".');
+
+        otherwise
+            error('InputType no reconocido: "%s".', input_type);
+    end
+end
 
 nBursts = size(burst_data.processed.pressure, 2);
 

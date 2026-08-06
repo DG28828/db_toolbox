@@ -86,6 +86,13 @@ if ~is_preprocessed
     error('El archivo %s no se encuentra preprocesado', proc_ncfile);
 end
 
+%% Verificación de instrumento
+instrument_type = upper(string(ncreadatt(proc_ncfile, '/', 'instrument_type')));
+
+if instrument_type == "RBR"
+    error('El procesamiento direccional no es aplicable a campañas RBR, porque el instrumento no dispone de velocidades orbitales horizontales U y V.');
+end
+
 %% Leer datos de la campaña del archivo netCDF
 
 %Extraer datos de la campaña
