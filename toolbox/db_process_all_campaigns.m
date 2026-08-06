@@ -166,7 +166,7 @@ for i = 1:height(raw_campaigns_table)
         if opts.preproc_overwrite && preproc_status
             message = "Ya existe el archivo .nc limpio y ya estaba preprocesado, pero preproc_overwrite = true; se reprocesará.";
         else
-            message = "Ya existe el archivo .nc limpio, pero no está preprocesado; se ejecutará wsa_awac_process.";
+            message = "Ya existe el archivo .nc limpio, pero no está preprocesado; se ejecutará wsa_awac_preprocess.";
         end
     
     elseif proc_nc_exists && ~opts.preproc_flag
