@@ -21,6 +21,10 @@ arguments
     opts.spectral_overwrite logical = false
     opts.directional_overwrite logical = false
 
+    opts.IG_flag = false;
+    opts.IGSpecDoF double = 8;
+    opts.IG_export_fmax (1,1) double {mustBePositive} = 0.1;
+
     opts.only_new logical = true
     opts.wsa_toolbox_dir char = ''
     opts.stop_on_error logical = false
@@ -269,8 +273,9 @@ for i = 1:height(campaigns_table)
                 'Kp_min', opts.Kp_min, ...
                 'pressure_units', opts.pressure_units, ...
                 'wsa_toolbox_dir', opts.wsa_toolbox_dir, ...
-                'IG_flag', true, ...
-                'IG_export_fmax', 0.1);
+                'IG_flag', opts.IG_flag, ...
+                'IGSpecDoF', opts.IGSpecDoF, ...
+                'IG_export_fmax', opts.IG_export_fmax);
 
             spectral_status = "success";
 
