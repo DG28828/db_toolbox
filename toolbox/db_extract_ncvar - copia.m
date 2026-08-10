@@ -704,83 +704,32 @@ function dt = local_posix2datetime(t, timezone)
     end
 end
 
-% function coords = local_read_coords(ncfile, file_type, var_path, info_var, method)
-%     coords = struct();
-%     dim_names = lower(string({info_var.Dimensions.Name}));
-% 
-%     has_freq = any(contains(dim_names, "frequency"));
-%     has_dir  = any(contains(dim_names, "direction"));
-% 
-%     if ~(has_freq || has_dir)
-%         return
-%     end
-% 
-%     switch file_type
-%         case "spectral"
-%             if has_freq
-%                 coords.f = local_read_coord_if_exists(ncfile, "f");
-%             end
-% 
-%         case "directional"
-%             group = local_directional_group_from_path(var_path, method);
-%             if has_freq
-%                 coords.f = local_read_coord_if_exists(ncfile, group + "/f");
-%             end
-%             if has_dir
-%                 coords.theta = local_read_coord_if_exists(ncfile, group + "/theta");
-%             end
-%     end
-% end
-
 function coords = local_read_coords(ncfile, file_type, var_path, info_var, method)
-%LOCAL_READ_COORDS Lee las coordenadas asociadas a una variable netCDF.
-%
-% Las coordenadas f, f_ig y theta se almacenan actualmente en la raíz
-% tanto de los archivos espectrales como de los direccionales.
-%
-% La selección de la coordenada se realiza a partir del nombre real
-% de la dimensión utilizada por la variable solicitada.
-
     coords = struct();
-
-    % Dimensiones de la variable solicitada
-
     dim_names = lower(string({info_var.Dimensions.Name}));
 
-    has_frequency    = any(dim_names == "frequency");
-    has_frequency_ig = any(dim_names == "frequency_ig");
-    has_direction    = any(dim_names == "direction");
+    has_freq = any(contains(dim_names, "frequency"));
+    has_dir  = any(contains(dim_names, "direction"));
 
-    % Frecuencia
-
-    if has_frequency
-
-        coords.f = local_read_coord_if_exists( ...
-            ncfile, ...
-            "f");
-
-        coords.f_name = "f";
-
-    elseif has_frequency_ig
-
-        coords.f = local_read_coord_if_exists( ...
-            ncfile, ...
-            "f_ig");
-
-        coords.f_name = "f_ig";
-
+    if ~(has_freq || has_dir)
+        return
     end
 
-    % Dirección
+    switch file_type
+        case "spectral"
+            if has_freq
+                coords.f = local_read_coord_if_exists(ncfile, "f");
+            end
 
-    if has_direction
-
-        coords.theta = local_read_coord_if_exists( ...
-            ncfile, ...
-            "theta");
-
+        case "directional"
+            group = local_directional_group_from_path(var_path, method);
+            if has_freq
+                coords.f = local_read_coord_if_exists(ncfile, group + "/f");
+            end
+            if has_dir
+                coords.theta = local_read_coord_if_exists(ncfile, group + "/theta");
+            end
     end
-
 end
 
 function group = local_directional_group_from_path(var_path, method)
