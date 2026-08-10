@@ -178,7 +178,7 @@ if isempty(mounting_height)                                                 % Se
         idx = db_find_table_rows(T, "id", id_search);                       % Buscar id dentro de la tabla
         if ~isempty(idx)                                                    % Se ejecuta si existe el id
             fprintf('Existe el id de la campaña en el archivo de metadatos: id = %s.\n', id_search)
-            mounting_height = double(T.mounting_height(idx));               % Asignar valor correspondiente al campo existente.
+            mounting_height = double(T.mounting_height_m(idx));               % Asignar valor correspondiente al campo existente.
             if isnan(mounting_height)
                 mounting_height = [];
             end
