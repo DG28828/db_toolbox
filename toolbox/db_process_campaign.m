@@ -22,6 +22,7 @@ arguments
     opts.clean_overwrite logical = false
     opts.preproc_overwrite logical = false
     opts.preproc_flag logical = true
+    opts.min_pressure_limit {mustBeNumeric} = 1
 end
 
 mounting_height = opts.mounting_height;  %m
@@ -221,15 +222,18 @@ else
         case "AWAC"
             data = wsa_awac_read(files_dir, ...                                    
                                 'do_plot', true, ...
-                                'save_plot_dir', save_plot_dir);
+                                'save_plot_dir', save_plot_dir, ...
+                                'min_pressure_limit', opts.min_pressure_limit);
         case "AQUADOPP"
             data = wsa_aquadopp_read(files_dir, ...                                  
                                 'do_plot', true, ...
-                                'save_plot_dir', save_plot_dir);
+                                'save_plot_dir', save_plot_dir, ...
+                                'min_pressure_limit', opts.min_pressure_limit);
         case "RBR"
             data = wsa_rbr_read(files_dir, ...
                                 'do_plot', true, ...
-                                'save_plot_dir', save_plot_dir);
+                                'save_plot_dir', save_plot_dir, ...
+                                'min_pressure_limit', opts.min_pressure_limit);
         otherwise
             error('El tipo de instrumento no es una opción válida.')
     end
